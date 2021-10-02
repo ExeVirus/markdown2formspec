@@ -198,7 +198,7 @@ local function finishParse(state)
     if state.in_quote then
         --revert the color and add the bottom image
         state.formspec = state.formspec .. 
-        "<img name=halo width=".. (60*state.width) * 0.8 ..
+        "<img name=md2f_line width=".. (60*state.width) * 0.8 ..
         " height=5>\n<global color=#FFF>"
         state.in_quote = nil
     end
@@ -304,7 +304,7 @@ local function handleQuote(line, state)
 
             --Place the image bar on the top
             state.formspec = state.formspec .. 
-            "<img name=halo width=" .. (60*state.width) * 0.8 .. " height=5>\n" ..
+            "<img name=md2f_line width=" .. (60*state.width) * 0.8 .. " height=5>\n" ..
 
             --Change the text color
             "<global color=#CC8>"
