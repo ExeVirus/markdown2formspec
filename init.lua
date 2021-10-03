@@ -36,6 +36,8 @@ end
 -- Predeclare parseLine, because it's a large function,
 -- and it makes sense to have it defined later
 local parseLine = nil
+-- ditto handleCodeBlock
+local handleCodeBlock = nil
 
 -- The main parsing function for md2f
 local function unpack(text,width)
@@ -61,8 +63,11 @@ local function unpack(text,width)
     for lineNumber=1, #lines, 1 do
         parseLine(lines[lineNumber], state) --state is changed within function
     end
+
+    -- 5. handle block quotes seperately (bad code design)
+    handleCodeBlock(state)
    
-    -- 5. return the parsed formspec
+    -- 6. return the parsed formspec
     return state.formspec
 end
 
@@ -181,6 +186,7 @@ local function emphasisParse(text)
 
     --Now to handle formspec escaping
     text = text:gsub("]", "\\]") -- ]
+    text = text:gsub(";", "\\;") -- ;
 
     return text
 end
@@ -198,7 +204,7 @@ local function finishParse(state)
     if state.in_quote then
         --revert the color and add the bottom image
         state.formspec = state.formspec .. 
-        "<img name=md2f_line width=".. (60*state.width) * 0.8 ..
+        "<img name=halo width=".. (60*state.width) * 0.8 ..
         " height=5>\n<global color=#FFF>"
         state.in_quote = nil
     end
@@ -304,7 +310,7 @@ local function handleQuote(line, state)
 
             --Place the image bar on the top
             state.formspec = state.formspec .. 
-            "<img name=md2f_line width=" .. (60*state.width) * 0.8 .. " height=5>\n" ..
+            "<img name=halo width=" .. (60*state.width) * 0.8 .. " height=5>\n" ..
 
             --Change the text color
             "<global color=#CC8>"
@@ -324,6 +330,48 @@ local function handleQuote(line, state)
         handlePlainText(text, state)
         handled = true
     end
+    return handled
+end
+
+------------------------------------------------------------
+-- handleCodeBlock()
+-- Merely matches lone ``` and replaces pairs with <mono></mono>
+-- state: Shared state variable of parser
+------------------------------------------------------------
+handleCodeBlock = function(state)
+    local finished = false
+    while finished == false do
+        if state.formspec:find("QqoMONOQqo.-QqoMONOQqo") then
+            local start, finish = state.formspec:find("QqoMONOQqo.-QqoMONOQqo")
+            state.formspec = state.formspec:sub(1,start-1) .. "<mono>" .. state.formspec:sub(start+11,finish-10) .. "</mono>" .. state.formspec:sub(finish+1)
+        else
+            finished = true
+        end
+    end
+    --now for any stragglers
+    if state.formspec:find("QqoMONOQqo") then
+        local start, finish = state.formspec:find("QqoMONOQqo")
+        state.formspec = state.formspec:sub(1,start-1) .. state.formspec:sub(finish+1)
+    end
+end
+
+------------------------------------------------------------
+-- parseCodeBlock()
+-- replaces any "```" with a tempstring
+-- line: Line to be handled
+-- state: Shared state variable of parser
+------------------------------------------------------------
+local function parseCodeBlock(line, state)
+    --track if we handled it
+    local handled = false
+    
+    if line:find("^```") then
+        --Finish any previous lines
+        finishParse(state)
+        state.formspec = state.formspec .. "QqoMONOQqo"
+        handled = true
+    end
+
     return handled
 end
 
@@ -461,7 +509,7 @@ local function handleHorizontalRule(line, state)
         --Finish any previous lines
         finishParse(state)
         -- Add horizontal rule
-        state.formspec = state.formspec .. "<img name=md2f_line width="..(60*state.width).." height=4>\n"
+        state.formspec = state.formspec .. "<img name=halo width="..(60*state.width).." height=4>\n"
         handled = true
     end
 
@@ -509,8 +557,12 @@ parseLine = function(line, state)
         return
     elseif handleNewLine(line,state) then
         return
+    elseif parseCodeBlock(line,state) then
+        return
     else --plaintext
-        finishParse(state)
+        if state.in_quote or state.in_ordered_list or state.in_unordered_list then
+            finishParse(state)
+        end
         if handlePlainText(line,state) then
             return
         end
@@ -553,4 +605,11 @@ end
 md2f.md2ff = function(x,y,w,h,filename,name)
     local text = loadFile(filename)
     return md2f.md2f(x,y,w,h,text,name)
+end
+
+-- header()
+--
+-- Default formspec header for the lazy
+md2f.header = function()
+	return "formspec_version[4]size[20,20]position[0.5,0.5]bgcolor[#111E]\n"
 end
