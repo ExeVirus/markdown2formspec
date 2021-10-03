@@ -16,7 +16,7 @@ Notes:
 1. All images will be centered
 2. Images have extra syntax: `![w,h](image.png)` will result in an image scaled to those provided dimensions in pixels.
 3. Nesting is not supported at this time (such as headings inside block quotes)
-4. ``` are supported, but they must begin a line to count. # headers and > quotes still work as normal, they just now would be monospaced. No background darkening used.
+4. \`\`\` are supported, but they must begin a line to count. # headers and > quotes still work as normal, they just now would be monospaced. No background darkening used.
 5. Headings are not auto-bolded or auto underlined
 
 -----------------------------------------
