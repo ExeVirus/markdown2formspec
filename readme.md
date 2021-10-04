@@ -5,9 +5,9 @@ A super simple mod to covert markdown text into part of a formspec, specifically
 There are two functions provided:
 
 ```lua
-md2f(x,y,w,h,markdown_string)
+md2f.md2f(x,y,w,h,markdown_string)
 
-md2ff(x,y,w,h,markdown_file)
+md2f.md2ff(x,y,w,h,markdown_file)
 ```
 
 Both will result in correctly formatted hypertext elements that match markdown output.
