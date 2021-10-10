@@ -36,11 +36,9 @@ end
 -- Predeclare parseLine, because it's a large function,
 -- and it makes sense to have it defined later
 local parseLine = nil
--- ditto handleCodeBlock
-local handleCodeBlock = nil
 
 -- The main parsing function for md2f
-local function unpack(text,width)
+local function unpack(text,width, settings)
 
     -- 1. Convert newlines to \n
     text = text:gsub("\r\n", "\n") --windows
@@ -57,17 +55,38 @@ local function unpack(text,width)
         formspec = "",
         width = width,
         carried_text = "",
+        settings = settings
     }
+    
+    -- 3a. Handle global settings
+    if state.settings ~= nil then
+        --handle if not all settings are set
+        if  settings.background_color and
+            settings.font_color and
+            settings.heading_1_color and
+            settings.heading_2_color and
+            settings.heading_3_color and
+            settings.heading_4_color and
+            settings.heading_5_color and
+            settings.heading_6_color and
+            settings.code_block_mono_color and
+            settings.code_block_font_size and
+            settings.mono_color and
+            settings.block_quote_color
+        then
+            --set the globals
+            state.formspec = "<global background="..settings.background_color.. " color=".. settings.font_color ..">"
+        else
+            state.settings = nil
+        end
+    end
 
     -- 4. iterate over lines, parsing linearly
     for lineNumber=1, #lines, 1 do
         parseLine(lines[lineNumber], state) --state is changed within function
     end
-
-    -- 5. handle block quotes seperately (bad code design)
-    handleCodeBlock(state)
    
-    -- 6. return the parsed formspec
+    -- 5. return the parsed formspec
     return state.formspec
 end
 
@@ -79,6 +98,10 @@ end
 --Remove extra whitespace in between words or characters
 local function trimMd(s)
     return s:gsub("\t", " "):gsub("%s+", " ")
+end
+
+local function escapeHypertext(s)
+    return s:gsub("<", "\\<"):gsub(";","\\;"):gsub("]","\\]")
 end
 
 ------------------------------------------------------------
@@ -145,14 +168,14 @@ end
 -- It also handles formspec escaping such as \] and \\\\ messiness
 -- text: text to be added
 ------------------------------------------------------------
-local function emphasisParse(text)
+local function emphasisParse(text, state)
     text = escape(text)
     local finished = false
     local last = 1
     while finished == false do
         if text:find("<%S.-%S>", last) then --url
             local start,finish = text:find("<%S.-%S>", last)
-            text = text:sub(1,start-1) .. "<global color=#AAF>" .. text:sub(start+1,finish-1) .. "<global color=#FFF>" .. text:sub(finish+1)
+            text = text:sub(1,start-1) .. "<style color=#77AAFF>" .. text:sub(start+1,finish-1) .. "</style>" .. text:sub(finish+1)
             last = finish + 36 --number of characters added minus 2
         else
             finished = true
@@ -162,7 +185,15 @@ local function emphasisParse(text)
     while finished == false do
         if text:find("`%S.-%S`") then --monospaced
             local start,finish = text:find("`%S.-%S`")
-            text = text:sub(1,start-1) .. "<mono>" .. text:sub(start+1,finish-1) .. "</mono>" .. text:sub(finish+1)
+            local mono_start, mono_end
+            if state.settings ~= nil then
+                mono_start = "<mono><style color=".. state.settings.mono_color ..">"
+                mono_end = "</mono></style>"
+            else
+                mono_start = "<mono>"
+                mono_end = "</mono>"
+            end
+            text = text:sub(1,start-1) .. mono_start .. text:sub(start+1,finish-1) .. mono_end .. text:sub(finish+1)
         else
             finished = true
         end
@@ -188,7 +219,7 @@ local function emphasisParse(text)
     text = text:gsub("]", "\\]") -- ]
     text = text:gsub(";", "\\;") -- ;
 
-    return text
+    return escapeHypertext(text)
 end
 
 --This function will close all states such as 
@@ -196,7 +227,7 @@ end
 local function finishParse(state)
     --Finish Plain Text first
     if state.carried_text ~= "" then
-        state.formspec = state.formspec .. emphasisParse(state.carried_text) .. "\n"
+        state.formspec = state.formspec .. emphasisParse(state.carried_text, state) .. "\n"
         state.carried_text = ""
     end
 
@@ -204,8 +235,12 @@ local function finishParse(state)
     if state.in_quote then
         --revert the color and add the bottom image
         state.formspec = state.formspec .. 
-        "<img name=halo width=".. (60*state.width) * 0.8 ..
-        " height=5>\n<global color=#FFF>"
+        "<img name=halo width=".. (60*state.width) * 0.8 .." height=5>\n"
+        if state.settings ~= nil then
+            state.formspec = state.formspec .. "<global color=".. state.settings.font_color ..">"
+        else
+            state.formspec = state.formspec .. "<global color=#FFF>"
+        end
         state.in_quote = nil
     end
 
@@ -256,18 +291,31 @@ local function handleHeading(line, state)
         if text:find("%w") and count > 0 and count < 7 then
             -- Finish any previous parsing whenever a new header is started
             finishParse(state)
+            
+            --handle colors from settings
+            local color = { [1]="", [2]="", [3]="", [4]="", [5]="", [6]=""}
+            if state.settings ~= nil then 
+                color = {
+                    [1]=" color=" .. state.settings.heading_1_color,
+                    [2]=" color=" .. state.settings.heading_2_color,
+                    [3]=" color=" .. state.settings.heading_3_color,
+                    [4]=" color=" .. state.settings.heading_4_color,
+                    [5]=" color=" .. state.settings.heading_5_color,
+                    [6]=" color=" .. state.settings.heading_6_color,
+                }
+            end
             if count == 1 then
-                state.formspec = state.formspec .. "<style size=48>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=48"..color[1]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 2 then
-                state.formspec = state.formspec .. "<style size=36>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=36"..color[2]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 3 then
-                state.formspec = state.formspec .. "<style size=30>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=30"..color[3]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 4 then
-                state.formspec = state.formspec .. "<style size=24>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=24"..color[4]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 5 then
-                state.formspec = state.formspec .. "<style size=16>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=16"..color[5]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 6 then
-                state.formspec = state.formspec .. "<style size=12>"..emphasisParse(text).."</style>\n"
+                state.formspec = state.formspec .. "<style size=12"..color[6]..">"..emphasisParse(text, state).."</style>\n"
             end
             handled = true
         end
@@ -310,10 +358,14 @@ local function handleQuote(line, state)
 
             --Place the image bar on the top
             state.formspec = state.formspec .. 
-            "<img name=halo width=" .. (60*state.width) * 0.8 .. " height=5>\n" ..
+            "<img name=halo width=" .. (60*state.width) * 0.8 .. " height=5>\n"
 
             --Change the text color
-            "<global color=#CC8>"
+            if state.settings ~= nil then
+                state.formspec = state.formspec .. "<global color=".. state.settings.block_quote_color ..">"
+            else
+                state.formspec = state.formspec .. "<global color=#CC8>"
+            end
 
             --Then modify our state to being in a quote block
             state.in_quote = true
@@ -335,41 +387,39 @@ end
 
 ------------------------------------------------------------
 -- handleCodeBlock()
--- Merely matches lone ``` and replaces pairs with <mono></mono>
--- state: Shared state variable of parser
-------------------------------------------------------------
-handleCodeBlock = function(state)
-    local finished = false
-    while finished == false do
-        if state.formspec:find("QqoMONOQqo.-QqoMONOQqo") then
-            local start, finish = state.formspec:find("QqoMONOQqo.-QqoMONOQqo")
-            state.formspec = state.formspec:sub(1,start-1) .. "<mono>" .. state.formspec:sub(start+11,finish-10) .. "</mono>" .. state.formspec:sub(finish+1)
-        else
-            finished = true
-        end
-    end
-    --now for any stragglers
-    if state.formspec:find("QqoMONOQqo") then
-        local start, finish = state.formspec:find("QqoMONOQqo")
-        state.formspec = state.formspec:sub(1,start-1) .. state.formspec:sub(finish+1)
-    end
-end
-
-------------------------------------------------------------
--- parseCodeBlock()
--- replaces any "```" with a tempstring
+-- handles ``` codeblocks
 -- line: Line to be handled
 -- state: Shared state variable of parser
 ------------------------------------------------------------
-local function parseCodeBlock(line, state)
+local function handleCodeBlock(line, state)
     --track if we handled it
     local handled = false
     
-    if line:find("^```") then
-        --Finish any previous lines
-        finishParse(state)
-        state.formspec = state.formspec .. "QqoMONOQqo"
-        handled = true
+    if state.block_quote then
+        if line:find("^```") then
+            state.block_quote = nil
+            state.formspec = state.formspec .. "</mono>"
+            if state.settings ~= nil then
+                state.formspec = state.formspec .. "</style>"
+            end
+            handled = true
+        else
+           state.formspec = state.formspec .. escapeHypertext(line) .. "\n"
+           handled = true
+        end
+    else
+        if line:find("^```") then
+            --Finish any previous lines
+            finishParse(state)
+            state.block_quote = true
+            state.formspec = state.formspec .. "<mono>"
+            if state.settings ~= nil then
+                state.formspec = state.formspec ..
+                "<style color=".. state.settings.code_block_mono_color
+                .." size=".. state.settings.code_block_font_size .. ">"
+            end
+            handled = true
+        end
     end
 
     return handled
@@ -396,14 +446,14 @@ local function handleOrderedList(line, state)
             finishParse(state)
 
             --Place the number followed by the line
-            state.formspec = state.formspec .. " 1. " .. emphasisParse(text) .. "\n"
+            state.formspec = state.formspec .. " 1. " .. emphasisParse(text, state) .. "\n"
 
             -- Then make note of our state
             state.in_ordered_list = true
             state.listnum = 2
         else
             -- Place next number followed by line
-            state.formspec = state.formspec .. " "..state.listnum.. ". " .. emphasisParse(text) .. "\n"
+            state.formspec = state.formspec .. " "..state.listnum.. ". " .. emphasisParse(text, state) .. "\n"
             -- Increment for next number
             state.listnum = state.listnum + 1
         end
@@ -434,12 +484,12 @@ local function handleUnorderedList(line, state)
             finishParse(state)
 
             --Place the number followed by the line
-            state.formspec = state.formspec .. " - " .. emphasisParse(text) .. "\n"
+            state.formspec = state.formspec .. " - " .. emphasisParse(text, state) .. "\n"
 
             -- Then make note of our state
             state.in_unordered_list = true
         else
-            state.formspec = state.formspec .. " - " .. emphasisParse(text) .. "\n"
+            state.formspec = state.formspec .. " - " .. emphasisParse(text, state) .. "\n"
         end
         handled = true
     end
@@ -465,9 +515,9 @@ local function handleImage(line, state)
 
         local _,_,w,h,filename = line:find("^!%[(%d*),?(%d*)%]%((%w+)%)")
         if w ~= "" and h ~= "" then
-            state.formspec = state.formspec .. "<img name="..filename.." width="..w.." height="..h..">\n"
+            state.formspec = state.formspec .. "<global halign=center>\n<img name="..escapeHypertext(filename).." width="..w.." height="..h.."><global halign=left>\n"
         else
-            state.formspec = state.formspec .. "<img name="..filename..">\n"
+            state.formspec = state.formspec .. "<global halign=center>\n<img name="..escapeHypertext(filename).."><global halign=left>\n"
         end
         handled = true
     end
@@ -540,9 +590,11 @@ end
 -- state: current state of parser
 ------------------------------------------------------------
 parseLine = function(line, state)
+    if handleCodeBlock(line,state) then
+        return
+    end
     -- Remove preceding and trailing whitespace
     line = trim(line)
-
     if handleHeading(line,state) then
         return
     elseif handleQuote(line,state) then
@@ -556,8 +608,6 @@ parseLine = function(line, state)
     elseif handleHorizontalRule(line,state) then
         return
     elseif handleNewLine(line,state) then
-        return
-    elseif parseCodeBlock(line,state) then
         return
     else --plaintext
         if state.in_quote or state.in_ordered_list or state.in_unordered_list then
@@ -585,13 +635,13 @@ md2f = {}
 -- h: height of hypertext element. Scrollbar appears when it overflows
 -- text: markdown text to convert
 -- name: optional name for hypertext element
-md2f.md2f = function(x,y,w,h,text,name)
+md2f.md2f = function(x,y,w,h,text,name,settings)
     if text == nil then
-        --minetest.log(filename .. "does not exist or is empty")
+        minetest.log(filename .. "does not exist or is empty")
         return ""
     end
     name = name or "markdown"
-    return header(x,y,w,h,name) .. unpack(text,w) .. footer()
+    return header(x,y,w,h,name) .. unpack(text,w,settings) .. footer()
 end
 
 -- md2ff()
@@ -602,9 +652,9 @@ end
 -- h: height of hypertext element. Scrollbar appears when it overflows
 -- file: exact name and location of the markdown file to convert
 -- name: optional name for hypertext element
-md2f.md2ff = function(x,y,w,h,filename,name)
+md2f.md2ff = function(x,y,w,h,filename,name,settings)
     local text = loadFile(filename)
-    return md2f.md2f(x,y,w,h,text,name)
+    return md2f.md2f(x,y,w,h,text,name,settings)
 end
 
 -- header()
