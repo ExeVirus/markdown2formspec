@@ -46,7 +46,7 @@ If it is not present, basically everything is white by default, and size 16 font
 -----------------------------------------
 
 # Sample of tested and supported markdown:
-```markdown
+````markdown
 # Level 1
 ## Level 2
 ### Level 3
@@ -108,7 +108,7 @@ _______
 ----------
 ----------
 
-```
+````
 # Output in formspec
 
 ![screenshot](screenshot.jpg)
