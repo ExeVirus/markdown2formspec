@@ -37,7 +37,7 @@ end
 -- and it makes sense to have it defined later
 local parseLine = nil
 
--- The main parsing function for md2f
+------------------------The main parsing function for md2f-------------------------------
 local function unpack(text,width, settings)
 
     -- 1. Convert newlines to \n
@@ -50,43 +50,41 @@ local function unpack(text,width, settings)
         table.insert(lines, s)
     end
 
-    -- 3. declare tracking table for keeping track of our state (text, bold, block quote, etc.)
+    -- 3. Handle Settings
+    settings = settings or {}
+    settings.background_color = settings.background_color or "#bababa25"
+    settings.font_color = settings.font_color or "#FFF"
+    settings.heading_1_color = settings.heading_1_color or "#AFA"
+    settings.heading_2_color = settings.heading_2_color or "#FAA"
+    settings.heading_3_color = settings.heading_3_color or "#AAF"
+    settings.heading_4_color = settings.heading_4_color or "#FFA"
+    settings.heading_5_color = settings.heading_5_color or "#AFF"
+    settings.heading_6_color = settings.heading_6_color or "#FAF"
+    settings.heading_1_size = settings.heading_1_size or "26"
+    settings.heading_2_size = settings.heading_2_size or "24"
+    settings.heading_3_size = settings.heading_3_size or "22"
+    settings.heading_4_size = settings.heading_4_size or "20"
+    settings.heading_5_size = settings.heading_5_size or "18"
+    settings.heading_6_size = settings.heading_6_size or "16"
+    settings.code_block_mono_color = settings.code_block_mono_color or "#6F6"
+    settings.code_block_font_size = settings.code_block_font_size or 14
+    settings.mono_color = settings.mono_color or "#6F6"
+    settings.block_quote_color = settings.block_quote_color or "#FFA"
+
+    -- 4. declare tracking table for keeping track of our state (text, bold, block quote, etc.)
     local state = { 
-        formspec = "",
+        formspec = "<global background="..settings.background_color.. " color=".. settings.font_color ..">",
         width = width,
         carried_text = "",
         settings = settings
     }
-    
-    -- 3a. Handle global settings
-    if state.settings ~= nil then
-        --handle if not all settings are set
-        if  settings.background_color and
-            settings.font_color and
-            settings.heading_1_color and
-            settings.heading_2_color and
-            settings.heading_3_color and
-            settings.heading_4_color and
-            settings.heading_5_color and
-            settings.heading_6_color and
-            settings.code_block_mono_color and
-            settings.code_block_font_size and
-            settings.mono_color and
-            settings.block_quote_color
-        then
-            --set the globals
-            state.formspec = "<global background="..settings.background_color.. " color=".. settings.font_color ..">"
-        else
-            state.settings = nil
-        end
-    end
 
-    -- 4. iterate over lines, parsing linearly
+    -- 5. iterate over lines, parsing linearly
     for lineNumber=1, #lines, 1 do
         parseLine(lines[lineNumber], state) --state is changed within function
     end
    
-    -- 5. return the parsed formspec
+    -- 6. return the parsed formspec
     return state.formspec
 end
 
@@ -294,6 +292,7 @@ local function handleHeading(line, state)
             
             --handle colors from settings
             local color = { [1]="", [2]="", [3]="", [4]="", [5]="", [6]=""}
+            local size  = { [1]="48", [2]="36", [3]="30", [4]="24", [5]="16", [6]="12"}
             if state.settings ~= nil then 
                 color = {
                     [1]=" color=" .. state.settings.heading_1_color,
@@ -303,19 +302,27 @@ local function handleHeading(line, state)
                     [5]=" color=" .. state.settings.heading_5_color,
                     [6]=" color=" .. state.settings.heading_6_color,
                 }
+                size = {
+                    [1]= state.settings.heading_1_size,
+                    [2]= state.settings.heading_2_size,
+                    [3]= state.settings.heading_3_size,
+                    [4]= state.settings.heading_4_size,
+                    [5]= state.settings.heading_5_size,
+                    [6]= state.settings.heading_6_size,
+                }
             end
             if count == 1 then
-                state.formspec = state.formspec .. "<style size=48"..color[1]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[1]..color[1]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 2 then
-                state.formspec = state.formspec .. "<style size=36"..color[2]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[2]..color[2]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 3 then
-                state.formspec = state.formspec .. "<style size=30"..color[3]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[3]..color[3]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 4 then
-                state.formspec = state.formspec .. "<style size=24"..color[4]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[4]..color[4]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 5 then
-                state.formspec = state.formspec .. "<style size=16"..color[5]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[5]..color[5]..">"..emphasisParse(text, state).."</style>\n"
             elseif count == 6 then
-                state.formspec = state.formspec .. "<style size=12"..color[6]..">"..emphasisParse(text, state).."</style>\n"
+                state.formspec = state.formspec .. "<style size="..size[6]..color[6]..">"..emphasisParse(text, state).."</style>\n"
             end
             handled = true
         end

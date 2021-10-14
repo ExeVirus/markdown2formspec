@@ -14,25 +14,30 @@ Both will result in correctly formatted hypertext elements that match markdown o
 
 ### Settings
 
-`settings` is an optional argument, and if present, must be defined as such:
+`settings` is an optional argument, and if present, can override any of the following default settings:
 
 ```lua
 settings = {
-    background_color = "#RGBA",
-    font_color = "#RGBA",
-    heading_1_color = "#RGBA",
-    heading_2_color = "#RGBA",
-    heading_3_color = "#RGBA",
-    heading_4_color = "#RGBA",
-    heading_5_color = "#RGBA",
-    heading_6_color = "#RGBA",
-    code_block_mono_color = "#RGBA",
-    code_block_font_size = #,
-    mono_color = "#RGBA",
-    block_quote_color = "#RGBA",
+    background_color = "#bababa25",
+    font_color = "#FFF",
+    heading_1_color = "#AFA",
+    heading_2_color = "#FAA",
+    heading_3_color = "#AAF",
+    heading_4_color = "#FFA",
+    heading_5_color = "#AFF",
+    heading_6_color = "#FAF",
+    heading_1_size = "26",
+    heading_2_size = "24",
+    heading_3_size = "22",
+    heading_4_size = "20",
+    heading_5_size = "18",
+    heading_6_size = "16",
+    code_block_mono_color = "#6F6",
+    code_block_font_size = 14,
+    mono_color = "#6F6",
+    block_quote_color = "#FFA",
 }
 ```
-If it is not present, basically everything is white by default, and size 16 font, except headings.
 
 ### Notes
 
