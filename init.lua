@@ -201,8 +201,8 @@ local function emphasisParse(text, state)
     last = 1
     --Handle URLS
     while finished == false do
-        if text:find("<%S.-\\>", last) then --url
-            local start,finish,capture = text:find("<(%S.-)\\>", last)
+        if text:find("\\\\<%S.-\\>", last) then --url
+            local start,finish,capture = text:find("\\\\<(%S.-)\\\\>", last)
             text = text:sub(1,start-1) .. "<style color=#77AAFF>" .. capture .. "</style>" .. text:sub(finish+1)
             last = finish + 28 --number of characters added minus 2
         else
@@ -230,7 +230,6 @@ local function emphasisParse(text, state)
     local numReplacements
     for numReplacements=1,#MonoSpaceInserts,1 do
         text = text:gsub("~QqvZ~", MonoSpaceInserts[numReplacements], 1) --replace the first one, repeating the order
-        minetest.log(MonoSpaceInserts[numReplacements])
     end
 
     --Now to handle formspec escaping
