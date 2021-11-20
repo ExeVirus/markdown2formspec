@@ -44,6 +44,14 @@ local function unpack(text,width, settings)
     text = text:gsub("\r\n", "\n") --windows
     text = text:gsub("\r", "\n") -- MacOs 9 and older
 
+    -- 2. Do replaces on the entire file, specifically for underlined text and four-spacing code blocks
+
+    -- a. Level one titles
+    --  Title
+    --  ======
+    
+
+
     -- 2. Break apart lines into array
     lines = {}
     for s in text:gmatch("([^\n]*)\n?") do
@@ -99,7 +107,7 @@ local function trimMd(s)
 end
 
 local function escapeHypertext(s)
-    return s:gsub("<", "\\<"):gsub(";","\\;"):gsub("]","\\]")
+    return s:gsub("\\", "\\\\"):gsub(">", "\\\\>"):gsub("<", "\\\\<")
 end
 
 ------------------------------------------------------------
@@ -167,22 +175,14 @@ end
 -- text: text to be added
 ------------------------------------------------------------
 local function emphasisParse(text, state)
-    text = escape(text)
+    text = escapeHypertext(text)
+    
+    --Handle Monospace `` characters
     local finished = false
-    local last = 1
+    local MonoSpaceInserts = {}
     while finished == false do
-        if text:find("<%S.-%S>", last) then --url
-            local start,finish = text:find("<%S.-%S>", last)
-            text = text:sub(1,start-1) .. "<style color=#77AAFF>" .. text:sub(start+1,finish-1) .. "</style>" .. text:sub(finish+1)
-            last = finish + 36 --number of characters added minus 2
-        else
-            finished = true
-        end
-    end
-    finished = false
-    while finished == false do
-        if text:find("`%S.-%S`") then --monospaced
-            local start,finish = text:find("`%S.-%S`")
+        if text:find("`%S.-%S?`") then --monospaced
+            local start,finish = text:find("`%S.-%S?`")
             local mono_start, mono_end
             if state.settings ~= nil then
                 mono_start = "<mono><style color=".. state.settings.mono_color ..">"
@@ -191,12 +191,26 @@ local function emphasisParse(text, state)
                 mono_start = "<mono>"
                 mono_end = "</mono>"
             end
-            text = text:sub(1,start-1) .. mono_start .. text:sub(start+1,finish-1) .. mono_end .. text:sub(finish+1)
+            table.insert(MonoSpaceInserts, mono_start .. text:sub(start+1,finish-1) .. mono_end)
+            text = text:sub(1,start-1) .. "~QqvZ~" .. text:sub(finish+1)
         else
             finished = true
         end
     end
     finished = false
+    last = 1
+    --Handle URLS
+    while finished == false do
+        if text:find("<%S.-\\>", last) then --url
+            local start,finish,capture = text:find("<(%S.-)\\>", last)
+            text = text:sub(1,start-1) .. "<style color=#77AAFF>" .. capture .. "</style>" .. text:sub(finish+1)
+            last = finish + 28 --number of characters added minus 2
+        else
+            finished = true
+        end
+    end
+    finished = false
+    --Handle Bold and Italics
     while finished == false do
         if text:find("%*%*%*%S.-%S?%*%*%*") then --Handle all Bold and Italics combo first
             local start,finish = text:find("%*%*%*%S.-%S?%*%*%*")
@@ -211,13 +225,21 @@ local function emphasisParse(text, state)
             finished = true
         end
     end
-    text = unescape(text)
+
+    --Bring back the monospace inserts now that all that parsing is done
+    local numReplacements
+    for numReplacements=1,#MonoSpaceInserts,1 do
+        text = text:gsub("~QqvZ~", MonoSpaceInserts[numReplacements], 1) --replace the first one, repeating the order
+        minetest.log(MonoSpaceInserts[numReplacements])
+    end
 
     --Now to handle formspec escaping
-    text = text:gsub("]", "\\]") -- ]
-    text = text:gsub(";", "\\;") -- ;
+    text = text:gsub("%[", "\\[")
+    text = text:gsub(",", "\\,")
+    text = text:gsub(";","\\;")
+    text = text:gsub("]","\\]")
 
-    return escapeHypertext(text)
+    return text
 end
 
 --This function will close all states such as 
