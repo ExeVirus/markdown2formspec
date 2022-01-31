@@ -45,9 +45,9 @@ local function unpack(text,width, settings)
     text = text:gsub("\r", "\n") -- MacOs 9 and older
 
     -- 2. Break apart lines into array
-    lines = {}
+    local _lines = {}
     for s in text:gmatch("([^\n]*)\n?") do
-        table.insert(lines, s)
+        table.insert(_lines, s)
     end
 
     -- 3. Handle Settings
@@ -80,8 +80,8 @@ local function unpack(text,width, settings)
     }
 
     -- 5. iterate over lines, parsing linearly
-    for lineNumber=1, #lines, 1 do
-        parseLine(lines[lineNumber], state) --state is changed within function
+    for lineNumber=1, #_lines, 1 do
+        parseLine(_lines[lineNumber], state) --state is changed within function
     end
    
     -- 6. return the parsed formspec
