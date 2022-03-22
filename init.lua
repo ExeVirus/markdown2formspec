@@ -15,6 +15,10 @@
 
 ----------------Local Functions----------------
 
+local function D(msg)
+    minetest.log("verbose", msg)
+end
+
 local function loadFile(filename)
     local file = io.open(filename, "rb") -- r read mode and b binary mode
     if not file then return nil end
@@ -233,7 +237,7 @@ local function finishParse(state)
     if state.in_quote then
         --revert the color and add the bottom image
         state.formspec = state.formspec .. 
-        "<img name=halo width=".. (60*state.width) * 0.8 .." height=5>\n"
+        "<img name=md2f_line.png width=".. (60*state.width) * 0.8 .." height=5>\n"
         if state.settings ~= nil then
             state.formspec = state.formspec .. "<global color=".. state.settings.font_color ..">"
         else
@@ -365,7 +369,7 @@ local function handleQuote(line, state)
 
             --Place the image bar on the top
             state.formspec = state.formspec .. 
-            "<img name=halo width=" .. (60*state.width) * 0.8 .. " height=5>\n"
+            "<img name=md2f_line.png width=" .. (60*state.width) * 0.8 .. " height=5>\n"
 
             --Change the text color
             if state.settings ~= nil then
@@ -506,8 +510,8 @@ end
 
 ------------------------------------------------------------
 -- handleImage()
--- ![###,###](filename) the ###,### are optional, but if present
--- allows the image to be absolutely sized. 
+-- ![###,###,lr](filename) the ###,### allows the image to
+-- be absolutely sized; either l or r (optionally) floats the image left or right
 -- i.e. 25,25 = 25width/height in pixels
 -- line: Line to be handled
 -- state: Shared state variable of parser
@@ -515,16 +519,29 @@ end
 local function handleImage(line, state)
     --track if we handled it
     local handled = false
+    D("handleImage("..line..")")
     
-    if line:find("^!%[%d*,?%d*%]%(%w+%)") then -- ![##,##](filename)
+    if line:find("^!%[%d*,?%d*,?[lr]?%]%([%w%p]*%)") then -- ![##,##](filename)
         --Finish any previous lines
         finishParse(state)
 
-        local _,_,w,h,filename = line:find("^!%[(%d*),?(%d*)%]%((%w+)%)")
+        local _,_,w,h,float,filename = line:find("^!%[(%d*),?(%d*),?([lr]*)%]%(([%w%p]*)%)")
+        local tag = "<img name="..escapeHypertext(filename)
+        local lf = "\n"
+        if filename:find("item:///.*") then
+            tag = "<item name="..escapeHypertext(filename:gsub("item:///", ""))
+        end
+        if float == "l" then
+            tag = tag .. " float=left"
+            lf = ""
+        elseif float == "r" then
+            tag = tag .. " float=right"
+            lf = ""
+        end
         if w ~= "" and h ~= "" then
-            state.formspec = state.formspec .. "<global halign=center>\n<img name="..escapeHypertext(filename).." width="..w.." height="..h.."><global halign=left>\n"
+            state.formspec = state.formspec .. "<global halign=center>"..lf..tag.." width="..w.." height="..h.."><global halign=left>"..lf
         else
-            state.formspec = state.formspec .. "<global halign=center>\n<img name="..escapeHypertext(filename).."><global halign=left>\n"
+            state.formspec = state.formspec .. "<global halign=center>"..lf..tag.."><global halign=left>"..lf
         end
         handled = true
     end
@@ -566,7 +583,7 @@ local function handleHorizontalRule(line, state)
         --Finish any previous lines
         finishParse(state)
         -- Add horizontal rule
-        state.formspec = state.formspec .. "<img name=halo width="..(60*state.width).." height=4>\n"
+        state.formspec = state.formspec .. "<img name=md2f_line.png width="..(60*state.width).." height=4>\n"
         handled = true
     end
 
@@ -598,29 +615,38 @@ end
 ------------------------------------------------------------
 parseLine = function(line, state)
     if handleCodeBlock(line,state) then
+        D("CODEBLOCK: "..line)
         return
     end
     -- Remove preceding and trailing whitespace
     line = trim(line)
     if handleHeading(line,state) then
+        D("HEADING: "..line)
         return
     elseif handleQuote(line,state) then
+        D("QUOTE: "..line)
         return
     elseif handleOrderedList(line,state) then
+        D("OL: "..line)
         return
     elseif handleUnorderedList(line,state) then
+        D("UL: "..line)
         return
     elseif handleImage(line,state) then
+        D("IMG: "..line)
         return
     elseif handleHorizontalRule(line,state) then
+        D("RULE: "..line)
         return
     elseif handleNewLine(line,state) then
+        D("NEWLINE: "..line)
         return
     else --plaintext
         if state.in_quote or state.in_ordered_list or state.in_unordered_list then
             finishParse(state)
         end
         if handlePlainText(line,state) then
+            D("PLAIN: "..line)
             return
         end
     end
